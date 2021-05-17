@@ -38,8 +38,11 @@ dataset_str = FLAGS.dataset
 
 # Load data
 adj, features = load_data(dataset_str)
+print('show data adj:', adj)
+print('show data features:', features)
 
 # Store original adjacency matrix (without diagonal entries) for later
+# 存储原始邻接矩阵（没有对角线条目）以供以后使用
 adj_orig = adj
 adj_orig = adj_orig - sp.dia_matrix((adj_orig.diagonal()[np.newaxis, :], [0]), shape=adj_orig.shape)
 adj_orig.eliminate_zeros()

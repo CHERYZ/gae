@@ -60,6 +60,7 @@ class GCNModelAE(Model):
                                               dropout=self.dropout,
                                               logging=self.logging)(self.inputs)
 
+        # 经第一层GraphConvolutionSparse卷积，第二层GraphConvolution卷积，获得隐变量.
         self.embeddings = GraphConvolution(input_dim=FLAGS.hidden1,
                                            output_dim=FLAGS.hidden2,
                                            adj=self.adj,

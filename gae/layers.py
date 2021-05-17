@@ -68,6 +68,7 @@ class GraphConvolution(Layer):
     """Basic graph convolution layer for undirected graph without edge labels."""
     def __init__(self, input_dim, output_dim, adj, dropout=0., act=tf.nn.relu, **kwargs):
         super(GraphConvolution, self).__init__(**kwargs)
+        # 可以让变量有相同的命名.
         with tf.variable_scope(self.name + '_vars'):
             self.vars['weights'] = weight_variable_glorot(input_dim, output_dim, name="weights")
         self.dropout = dropout
@@ -92,12 +93,18 @@ class GraphConvolutionSparse(Layer):
         self.dropout = dropout
         self.adj = adj
         self.act = act
+
+        # 与GraphConvolution()的不同点.
         self.issparse = True
         self.features_nonzero = features_nonzero
 
     def _call(self, inputs):
         x = inputs
+
+        # 稀疏张量的dropout.
         x = dropout_sparse(x, 1-self.dropout, self.features_nonzero)
+
+        # 稀疏张量乘法.
         x = tf.sparse_tensor_dense_matmul(x, self.vars['weights'])
         x = tf.sparse_tensor_dense_matmul(self.adj, x)
         outputs = self.act(x)
