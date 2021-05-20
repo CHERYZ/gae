@@ -89,6 +89,7 @@ if __name__ == '__main__':
         features = sp.identity(features.shape[0])  # featureless
 
     # Some preprocessing
+    # 归一化邻接矩阵.
     adj_norm = preprocess_graph(adj)
 
     # Define placeholders

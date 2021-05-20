@@ -139,58 +139,36 @@ class GCNModelCMVAE(Model):
                                               dropout=self.dropout,
                                               logging=self.logging)(self.inputs)
 
-        # self.z_mean = GraphConvolution(input_dim=FLAGS.hidden1,
-        #                                output_dim=FLAGS.hidden2,
-        #                                adj=self.adj,
-        #                                act=lambda x: x,
-        #                                dropout=self.dropout,
-        #                                logging=self.logging)(self.hidden1)
-        #
-        # self.z_log_std = GraphConvolution(input_dim=FLAGS.hidden1,
-        #                                   output_dim=FLAGS.hidden2,
-        #                                   adj=self.adj,
-        #                                   act=lambda x: x,
-        #                                   dropout=self.dropout,
-        #                                   logging=self.logging)(self.hidden1)
-
-        # self.z = self.z_mean + tf.random_normal([self.n_samples, FLAGS.hidden2]) * tf.exp(self.z_log_std)
-
-        self.ex = GraphConvolution(input_dim=FLAGS.hidden1,
-                                   output_dim=FLAGS.hidden2,
-                                   adj=self.adj,
-                                   act=lambda x: x,
-                                   dropout=self.dropout,
-                                   logging=self.logging)(self.hidden1)
+        self.z_ex = GraphConvolution(input_dim=FLAGS.hidden1,
+                                     output_dim=FLAGS.hidden2,
+                                     adj=self.adj,
+                                     act=lambda x: x,
+                                     dropout=self.dropout,
+                                     logging=self.logging)(self.hidden1)
 
         # en 10* 调整.
-        self.en = 1e-6 + 10 * GraphConvolution(input_dim=FLAGS.hidden1,
-                                               output_dim=FLAGS.hidden2,
-                                               adj=self.adj,
-                                               act=tf.nn.softmax,
-                                               dropout=self.dropout,
-                                               logging=self.logging)(self.hidden1)
+        # self.en = 1e-6 + 10 * GraphConvolution(input_dim=FLAGS.hidden1,
+        self.z_en = GraphConvolution(input_dim=FLAGS.hidden1,
+                                     output_dim=FLAGS.hidden2,
+                                     adj=self.adj,
+                                     act=tf.nn.softmax,
+                                     dropout=self.dropout,
+                                     logging=self.logging)(self.hidden1)
 
-        self.he = 1e-6 + GraphConvolution(input_dim=FLAGS.hidden1,
-                                          output_dim=FLAGS.hidden2,
-                                          adj=self.adj,
-                                          act=tf.nn.softmax,
-                                          dropout=self.dropout,
-                                          logging=self.logging)(self.hidden1)
+        # self.he = 1e-6 + GraphConvolution(input_dim=FLAGS.hidden1,
+        self.z_log_he = GraphConvolution(input_dim=FLAGS.hidden1,
+                                         output_dim=FLAGS.hidden2,
+                                         adj=self.adj,
+                                         act=tf.nn.softmax,
+                                         dropout=self.dropout,
+                                         logging=self.logging)(self.hidden1)
 
-        for i in range(1000):
-            z_En = self.en + self.he * tf.random_normal([self.n_samples, FLAGS.hidden2])
-            z_Ex = self.ex + z_En * tf.random_normal([self.n_samples, FLAGS.hidden2])
-            # if i == 0:
-            #     c1 = z_Ex
-            # else:
-            #     c1 = tf.concat([c1, z_Ex], axis=0)
-            if i == 0:
-                c = z_Ex
-            else:
-                c = tf.add(c, z_Ex)
-        self.z = c / 1000
+        # 两次采样操作.
+        z_En = self.z_en + tf.random_normal([self.n_samples, FLAGS.hidden2]) * tf.exp(self.z_log_he)
 
-        self.z_mean = self.z
+        self.z_mean = self.z_ex
+
+        self.z = self.z_ex + z_En * tf.random_normal([self.n_samples, FLAGS.hidden2])
 
         self.reconstructions = InnerProductDecoder(input_dim=FLAGS.hidden2,
                                                    act=lambda x: x,
