@@ -34,8 +34,11 @@ def load_data(dataset):
         tx_extended[test_idx_range-min(test_idx_range), :] = tx
         tx = tx_extended
 
+    # features shape=(2708, 1433)
+    # 标记节点的features，即标记节点存在哪些特征.
     features = sp.vstack((allx, tx)).tolil()
     features[test_idx_reorder, :] = features[test_idx_range, :]
+
     adj = nx.adjacency_matrix(nx.from_dict_of_lists(graph))
 
     return adj, features

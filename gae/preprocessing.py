@@ -31,20 +31,30 @@ def construct_feed_dict(adj_normalized, adj, features, placeholders):
 
 def mask_test_edges(adj):
     # Function to build test set with 10% positive links
+    # 建立具有10％正向链接的测试集的功能
     # NOTE: Splits are randomized and results might slightly deviate from reported numbers in the paper.
+    # 注意：拆分是随机的，结果可能会略有偏离纸张中报告的数字。
     # TODO: Clean up.
 
     # Remove diagonal elements
+    # 删除对角线元素.
     adj = adj - sp.dia_matrix((adj.diagonal()[np.newaxis, :], [0]), shape=adj.shape)
     adj.eliminate_zeros()
     # Check that diag is zero:
     assert np.diag(adj.todense()).sum() == 0
 
+    # 返回上三角矩阵
     adj_triu = sp.triu(adj)
+
+    # 转换为coo_matrix
     adj_tuple = sparse_to_tuple(adj_triu)
     edges = adj_tuple[0]
     edges_all = sparse_to_tuple(adj)[0]
+
+    # 10%的测试集
     num_test = int(np.floor(edges.shape[0] / 10.))
+
+    # 5%的验证集
     num_val = int(np.floor(edges.shape[0] / 20.))
 
     all_edge_idx = list(range(edges.shape[0]))
@@ -108,4 +118,5 @@ def mask_test_edges(adj):
     adj_train = adj_train + adj_train.T
 
     # NOTE: these edge lists only contain single direction of edge!
+    # 无向图.
     return adj_train, train_edges, val_edges, val_edges_false, test_edges, test_edges_false
