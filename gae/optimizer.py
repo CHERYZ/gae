@@ -40,18 +40,35 @@ class OptimizerVAE(object):
 
         self.cost = norm * tf.reduce_mean(
             tf.nn.weighted_cross_entropy_with_logits(logits=preds_sub, targets=labels_sub, pos_weight=pos_weight))
+        # self.cost = 0
 
-        self.cross_entropy_cost = self.cost
+        self.log_lik = self.cost
+
+        # 输出hidden1.
+        self.hidden1 = model.hidden1
 
         # Latent loss
-        self.log_lik = self.cost
         self.kl = (0.5 / num_nodes) * tf.reduce_mean(
             tf.reduce_sum(
                 1 + 2 * model.z_log_std - tf.square(model.z_mean) -
                 tf.square(tf.exp(model.z_log_std)), 1
             )
         )
-        self.cost -= self.kl
+
+        # KL(p1||p2) = -1/2 * [2*z_log_std + 1 - z_std^2 - z_mean^2]
+        # 输出隐变量z，在train.py中打印输出.
+        # 测试输出z_mean，z_std输出
+        self.z_mean = model.z_mean
+        self.z_log_std = model.z_log_std
+
+        self.test_z_mean = tf.reduce_sum(self.z_mean, 1)
+
+        self.test_z_log_std = tf.reduce_sum(self.z_log_std, 1)
+        self.test_z_std = tf.reduce_sum(tf.exp(model.z_log_std), 1)
+
+        # self.cost -= self.kl
+        # self.kl < 0.
+        self.cost = self.log_lik - self.kl
 
         self.optimizer = tf.train.AdamOptimizer(learning_rate=FLAGS.learning_rate)  # Adam Optimizer
         self.opt_op = self.optimizer.minimize(self.cost)
@@ -76,6 +93,17 @@ class OptimizerCMVAE(object):
         preds_sub = preds
         labels_sub = labels
 
+        '''
+        model中隐变量输出测试.
+        在train.debug中可打印输出结果.
+        '''
+        self.test_z_ex = model.z_ex
+        self.test_z_log_en = model.z_log_en
+        self.test_z_log_he = model.z_log_he
+        self.test_z_en = model.z_en
+        self.test_z_he = model.z_he
+
+        # 交叉熵.
         self.cost = norm * tf.reduce_mean(
             tf.nn.weighted_cross_entropy_with_logits(logits=preds_sub, targets=labels_sub, pos_weight=pos_weight))
 
@@ -84,22 +112,49 @@ class OptimizerCMVAE(object):
         # Latent loss
         self.log_lik = self.cost
 
-        # KL_divergence = tf.reduce_sum(0.5 * ((tf.square(Ex) + 1 + tf.square(En + 3 * He)) * (
-        #         1 + 1 / (tf.square(En + 3 * He)))) - 1, 1)
-        self.kl = (0.5 / num_nodes) * tf.reduce_mean(tf.reduce_sum(
-            0.5 * ((tf.square(model.ex) + 1 + tf.square(model.en + 3 * model.he)) * (
-                    1 + 1 / (tf.square(model.en + 3 * model.he))
-            )) - 1, 1
-        ))
+        '''
+        CMVAE中原始的KL散度输出.
+        0.5 * (ex^2 + (en + 3*he)^2)
+        '''
+        # KL_divergence = tf.reduce_sum(
+        #          0.5 * ((tf.square(Ex) + 1 + tf.square(En + 3 * He))
+        #              * (1 + 1 / (tf.square(En + 3 * He)))
+        #              ) - 1
+        #          , 1)
 
+        '''
+        根据上述CMVAE 改写的GCMVAE KL散度.
+        '''
+        # self.kl = (0.5 / num_nodes) * tf.reduce_mean(
+        #     tf.reduce_sum(
+        #         0.5 * (
+        #                 tf.square(model.z_ex) + 1 + tf.square(
+        #                     tf.exp(model.z_log_en) + 3 * tf.exp(model.z_log_he)
+        #                 )
+        #                 * (1 + 1 / (tf.square(
+        #                         tf.exp(model.z_log_en) + 3 * tf.exp(model.z_log_he)
+        #                     )
+        #                  )
+        #                 )
+        #             ) - 1, 1
+        #     )
+        # )
+
+        '''
+        化简GCMVAE 的KL 散度.
+        kl = 1/2 * [ ex^2 + (en + 3he)^2 ]
+        kl = 1/2 * ())
+        '''
         self.kl = (0.5 / num_nodes) * tf.reduce_mean(
             tf.reduce_sum(
-                1 + 2 * model.z_log_he - tf.square(model.z_mean) -
-                tf.square(tf.exp(model.z_log_he)), 1
+                0.5 * (tf.square(model.z_ex) + tf.square(
+                    tf.exp(model.z_log_en) + 3 * tf.exp(model.z_log_he)
+                )), 1
             )
         )
 
-        self.cost -= self.kl
+        # self.cost -= self.kl
+        self.cost += self.kl
 
         self.opt_op = self.optimizer.minimize(self.cost)
         self.grads_vars = self.optimizer.compute_gradients(self.cost)

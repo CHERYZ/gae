@@ -110,8 +110,17 @@ class GCNModelVAE(Model):
                                           dropout=self.dropout,
                                           logging=self.logging)(self.hidden1)
 
+        # 测试，将z_log_std -> z_std.
+        # self.z_std = GraphConvolution(input_dim=FLAGS.hidden1,
+        #                               output_dim=FLAGS.hidden2,
+        #                               adj=self.adj,
+        #                               act=lambda x: x,
+        #                               dropout=self.dropout,
+        #                               logging=self.logging)(self.hidden1)
+
         # z = mu + epsilon * sigma
         self.z = self.z_mean + tf.random_normal([self.n_samples, FLAGS.hidden2]) * tf.exp(self.z_log_std)
+        # self.z = self.z_mean + self.z_log_std
 
         self.reconstructions = InnerProductDecoder(input_dim=FLAGS.hidden2,
                                                    act=lambda x: x,
@@ -148,12 +157,13 @@ class GCNModelCMVAE(Model):
 
         # en 10* 调整.
         # self.en = 1e-6 + 10 * GraphConvolution(input_dim=FLAGS.hidden1,
-        self.z_en = GraphConvolution(input_dim=FLAGS.hidden1,
-                                     output_dim=FLAGS.hidden2,
-                                     adj=self.adj,
-                                     act=tf.nn.softmax,
-                                     dropout=self.dropout,
-                                     logging=self.logging)(self.hidden1)
+        # z_en = GraphConvolution(input_dim=FLAGS.hidden1,
+        self.z_log_en = GraphConvolution(input_dim=FLAGS.hidden1,
+                                         output_dim=FLAGS.hidden2,
+                                         adj=self.adj,
+                                         act=tf.nn.softmax,
+                                         dropout=self.dropout,
+                                         logging=self.logging)(self.hidden1)
 
         # self.he = 1e-6 + GraphConvolution(input_dim=FLAGS.hidden1,
         self.z_log_he = GraphConvolution(input_dim=FLAGS.hidden1,
@@ -163,12 +173,18 @@ class GCNModelCMVAE(Model):
                                          dropout=self.dropout,
                                          logging=self.logging)(self.hidden1)
 
+        self.z_en = tf.exp(self.z_log_en)
+        self.z_he = tf.exp(self.z_log_he)
+
         # 两次采样操作.
-        z_En = self.z_en + tf.random_normal([self.n_samples, FLAGS.hidden2]) * tf.exp(self.z_log_he)
+        # z_En = self.z_en + tf.random_normal([self.n_samples, FLAGS.hidden2]) * tf.exp(self.z_log_he)
+
+        # 第一次采样
+        self.z_enn = self.z_log_en + tf.random_normal([self.n_samples, FLAGS.hidden2]) * tf.exp(self.z_log_he)
+        # 第二次采样
+        self.z = self.z_ex + tf.random_normal([self.n_samples, FLAGS.hidden2]) * self.z_enn
 
         self.z_mean = self.z_ex
-
-        self.z = self.z_ex + z_En * tf.random_normal([self.n_samples, FLAGS.hidden2])
 
         self.reconstructions = InnerProductDecoder(input_dim=FLAGS.hidden2,
                                                    act=lambda x: x,
