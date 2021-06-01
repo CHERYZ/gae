@@ -110,6 +110,8 @@ class GCNModelVAE(Model):
                                           dropout=self.dropout,
                                           logging=self.logging)(self.hidden1)
 
+        self.z_std = tf.exp(self.z_log_std)
+
         # 测试，将z_log_std -> z_std.
         # self.z_std = GraphConvolution(input_dim=FLAGS.hidden1,
         #                               output_dim=FLAGS.hidden2,
@@ -118,9 +120,13 @@ class GCNModelVAE(Model):
         #                               dropout=self.dropout,
         #                               logging=self.logging)(self.hidden1)
 
-        # z = mu + epsilon * sigma
+        # self.z_log_std = tf.log(self.z_std)
+
+        '''
+        z = mu + epsilon * sigma
+        '''
         self.z = self.z_mean + tf.random_normal([self.n_samples, FLAGS.hidden2]) * tf.exp(self.z_log_std)
-        # self.z = self.z_mean + self.z_log_std
+        # self.z = self.z_mean + tf.random_normal([self.n_samples, FLAGS.hidden2]) * self.z_std
 
         self.reconstructions = InnerProductDecoder(input_dim=FLAGS.hidden2,
                                                    act=lambda x: x,
@@ -174,17 +180,43 @@ class GCNModelCMVAE(Model):
                                          logging=self.logging)(self.hidden1)
 
         self.z_en = tf.exp(self.z_log_en)
-        self.z_he = tf.exp(self.z_log_he)
 
-        # 两次采样操作.
-        # z_En = self.z_en + tf.random_normal([self.n_samples, FLAGS.hidden2]) * tf.exp(self.z_log_he)
-
-        # 第一次采样
-        self.z_enn = self.z_log_en + tf.random_normal([self.n_samples, FLAGS.hidden2]) * tf.exp(self.z_log_he)
-        # 第二次采样
-        self.z = self.z_ex + tf.random_normal([self.n_samples, FLAGS.hidden2]) * self.z_enn
+        # 约束 He与En 为10倍关系.
+        self.z_he = 0.1 * tf.exp(self.z_log_he)
+        # self.z_he = tf.exp(self.z_log_he)
 
         self.z_mean = self.z_ex
+
+        '''
+        # 增加循环采样.
+        # 相当于增加采样次数.
+        '''
+        random_sample_1 = tf.random_normal([self.n_samples, FLAGS.hidden2])
+        for i in range(999):
+            random_sample_1 += tf.random_normal([self.n_samples, FLAGS.hidden2])
+        self.sample_1 = random_sample_1 / 1000
+
+        random_sample_2 = tf.random_normal([self.n_samples, FLAGS.hidden2])
+        for i in range(999):
+            random_sample_2 += tf.random_normal([self.n_samples, FLAGS.hidden2])
+        random_sample_2 = random_sample_2 / 1000
+
+        '''
+        # 两次采样操作.
+        
+        # 第一次采样
+        Enn = En + epsilon * He
+        '''
+        # self.z_enn = self.z_log_en + tf.random_normal([self.n_samples, FLAGS.hidden2]) * tf.exp(self.z_log_he)
+        # self.z_enn = self.z_en + tf.random_normal([self.n_samples, FLAGS.hidden2]) * self.z_he
+        self.z_enn = self.z_en + self.sample_1 * self.z_he
+
+        '''
+        # 第二次采样
+        z = Ex + epsilon * Enn
+        '''
+        self.z = self.z_ex + tf.random_normal([self.n_samples, FLAGS.hidden2]) * self.z_enn
+        # self.z = self.z_ex + random_sample_2 * self.z_enn
 
         self.reconstructions = InnerProductDecoder(input_dim=FLAGS.hidden2,
                                                    act=lambda x: x,

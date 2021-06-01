@@ -25,7 +25,8 @@ from gae.preprocessing import preprocess_graph, construct_feed_dict, sparse_to_t
 flags = tf.app.flags
 FLAGS = flags.FLAGS
 flags.DEFINE_float('learning_rate', 0.01, 'Initial learning rate.')
-flags.DEFINE_integer('epochs', 200, 'Number of epochs to train.')
+# flags.DEFINE_integer('epochs', 200, 'Number of epochs to train.')
+flags.DEFINE_integer('epochs', 100, 'Number of epochs to train.')
 flags.DEFINE_integer('hidden1', 32, 'Number of units in hidden layer 1.')
 flags.DEFINE_integer('hidden2', 16, 'Number of units in hidden layer 2.')
 flags.DEFINE_float('weight_decay', 0., 'Weight for L2 loss on embedding matrix.')
@@ -33,7 +34,9 @@ flags.DEFINE_float('dropout', 0., 'Dropout rate (1 - keep probability).')
 
 # flags.DEFINE_string('model', 'gcn_vae', 'Model string.')
 flags.DEFINE_string('model', 'gcn_cmvae', 'Model string.')
+
 flags.DEFINE_string('dataset', 'cora', 'Dataset string.')
+# flags.DEFINE_string('dataset', 'citeseer', 'Dataset string.')
 flags.DEFINE_integer('features', 1, 'Whether to use features (1) or not (0).')
 
 model_str = FLAGS.model
@@ -175,8 +178,8 @@ if __name__ == '__main__':
         if model_str == 'gcn_vae':
             outs_ori = sess.run([opt.opt_op, opt.cost, opt.accuracy,
                                  opt.log_lik, opt.kl,
-                                 # opt.z_mean, opt.z_log_std,
                                  # 输出测试.
+                                 opt.z_mean, opt.z_log_std, opt.z_std
                                  # opt.test_z_mean, opt.test_z_log_std, opt.test_z_std,
                                  # opt.hidden1], feed_dict=feed_dict)
                                  ], feed_dict=feed_dict)
@@ -188,12 +191,11 @@ if __name__ == '__main__':
             # 自定义输出交叉熵部分的损失.(VAE)
             cross_entropy_cost = outs_ori[3]
             kl = outs_ori[4]
-            # z_mean = outs_ori[5]
-            # z_log_std = outs_ori[6]
-            #
-            # test_z_mean = outs[7]
-            # test_z_log_std = outs_ori[8]
-            # test_z_std = outs_ori[9]
+
+            # 输出z_mean、z_log_std、z_std.
+            z_mean = outs_ori[5]
+            z_log_std = outs_ori[6]
+            z_std = outs_ori[7]
             # test_hidden1 = outs[10]
 
         elif model_str == 'gcn_cmvae':
@@ -206,7 +208,9 @@ if __name__ == '__main__':
                                    # 输出隐变量
                                    opt.test_z_ex, opt.test_z_log_en, opt.test_z_log_he,
                                    # 测试输出隐变量
-                                   opt.test_z_en, opt.test_z_he
+                                   opt.test_z_en, opt.test_z_he,
+                                   # 采样
+                                   model.sample_1
                                    ], feed_dict=feed_dict)
 
             avg_cost = outs_cmvae[1]
@@ -220,6 +224,7 @@ if __name__ == '__main__':
             z_log_he = outs_cmvae[7]
             z_en = outs_cmvae[8]
             z_he = outs_cmvae[9]
+            model_sample1 = outs_cmvae[10]
 
         train_loss_list.append(avg_cost)
         train_acc_list.append(avg_accuracy)
@@ -249,8 +254,8 @@ if __name__ == '__main__':
 
     # 绘制训练曲线.
     # 迭代了200次，所以x的取值范围为(0，200)，然后再将每次相对应的准确率以及损失率附在x上
-    x1 = range(0, 200)
-    x2 = range(0, 200)
+    x1 = range(0, 100)
+    x2 = range(0, 100)
     loss_draw = train_loss_list
     # acc_draw = train_acc_list
     ap_draw = train_ap_list

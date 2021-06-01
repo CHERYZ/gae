@@ -40,14 +40,16 @@ class OptimizerVAE(object):
 
         self.cost = norm * tf.reduce_mean(
             tf.nn.weighted_cross_entropy_with_logits(logits=preds_sub, targets=labels_sub, pos_weight=pos_weight))
-        # self.cost = 0
 
         self.log_lik = self.cost
 
         # 输出hidden1.
         self.hidden1 = model.hidden1
 
+        '''
         # Latent loss
+        kl = 1/2 * (1 + 2*log_std - z_mean^2 - std^2)
+        '''
         self.kl = (0.5 / num_nodes) * tf.reduce_mean(
             tf.reduce_sum(
                 1 + 2 * model.z_log_std - tf.square(model.z_mean) -
@@ -55,16 +57,19 @@ class OptimizerVAE(object):
             )
         )
 
+        # 测试，GCN输出 z_std.
+        # self.kl = (0.5 / num_nodes) * tf.reduce_mean(
+        #     tf.reduce_sum(
+        #         1 + 2 * tf.log(model.z_std) - tf.square(model.z_mean) - tf.square(model.z_std)
+        #         , 1)
+        # )
+
         # KL(p1||p2) = -1/2 * [2*z_log_std + 1 - z_std^2 - z_mean^2]
         # 输出隐变量z，在train.py中打印输出.
         # 测试输出z_mean，z_std输出
         self.z_mean = model.z_mean
         self.z_log_std = model.z_log_std
-
-        self.test_z_mean = tf.reduce_sum(self.z_mean, 1)
-
-        self.test_z_log_std = tf.reduce_sum(self.z_log_std, 1)
-        self.test_z_std = tf.reduce_sum(tf.exp(model.z_log_std), 1)
+        self.z_std = model.z_std
 
         # self.cost -= self.kl
         # self.kl < 0.
@@ -125,7 +130,7 @@ class OptimizerCMVAE(object):
         '''
         根据上述CMVAE 改写的GCMVAE KL散度.
         '''
-        # self.kl = (0.5 / num_nodes) * tf.reduce_mean(
+        # self.kl = num_nodes * tf.reduce_mean(
         #     tf.reduce_sum(
         #         0.5 * (
         #                 tf.square(model.z_ex) + 1 + tf.square(
@@ -141,15 +146,36 @@ class OptimizerCMVAE(object):
         # )
 
         '''
-        化简GCMVAE 的KL 散度.
-        kl = 1/2 * [ ex^2 + (en + 3he)^2 ]
-        kl = 1/2 * ())
+        论文中 KL散度计算式：
+        L = 0.5 * ((Ex1 - Ex2)^2 + sigma1^2 + sigma2^2) * (1 / sigma1^2 + 1 / sigma2^2) - 1
+        sigma1 = En1 + 3*He1
+        sigma2 = En2 + 3*He2
         '''
+
+        '''
+        设 Ex = 0, En = 1, He = 0;
+        L = 0.5 * ( (Ex / sigma)^2 + 1 / sigma^2 + Ex^2 + sigma^2 )
+        '''
+        # self.sigma = model.z_en + 3 * model.z_he
+        # self.kl = (0.5 / num_nodes) * tf.reduce_mean(
+        #     tf.reduce_sum(
+        #         tf.square(model.z_ex / self.sigma)
+        #         + 1 / tf.square(self.sigma)
+        #         + tf.square(model.z_ex)
+        #         + tf.square(self.sigma)
+        #         , 1)
+        # )
+
+        '''
+        设 Ex = 0, En=1.05, He=0.1;
+        L = 0.5 * {(Ex^2 + sigma^2 + 1.8225)(1 / sigma^2 + 1 / 1.35) - 2}
+        '''
+        self.sigma = model.z_en + 3 * model.z_he
         self.kl = (0.5 / num_nodes) * tf.reduce_mean(
             tf.reduce_sum(
-                0.5 * (tf.square(model.z_ex) + tf.square(
-                    tf.exp(model.z_log_en) + 3 * tf.exp(model.z_log_he)
-                )), 1
+                (tf.square(model.z_ex) + tf.square(self.sigma) + 1.8225)
+                * (1 / tf.square(self.sigma) + 1 / 1.35)
+                - 2, 1
             )
         )
 
