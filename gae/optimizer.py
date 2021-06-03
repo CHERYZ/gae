@@ -128,24 +128,6 @@ class OptimizerCMVAE(object):
         #          , 1)
 
         '''
-        根据上述CMVAE 改写的GCMVAE KL散度.
-        '''
-        # self.kl = num_nodes * tf.reduce_mean(
-        #     tf.reduce_sum(
-        #         0.5 * (
-        #                 tf.square(model.z_ex) + 1 + tf.square(
-        #                     tf.exp(model.z_log_en) + 3 * tf.exp(model.z_log_he)
-        #                 )
-        #                 * (1 + 1 / (tf.square(
-        #                         tf.exp(model.z_log_en) + 3 * tf.exp(model.z_log_he)
-        #                     )
-        #                  )
-        #                 )
-        #             ) - 1, 1
-        #     )
-        # )
-
-        '''
         论文中 KL散度计算式：
         L = 0.5 * ((Ex1 - Ex2)^2 + sigma1^2 + sigma2^2) * (1 / sigma1^2 + 1 / sigma2^2) - 1
         sigma1 = En1 + 3*He1
@@ -178,6 +160,19 @@ class OptimizerCMVAE(object):
                 - 2, 1
             )
         )
+
+        '''
+        设 Ex=0, En=1.06, He=0.105
+        L = 0.5 *(Ex^2 + sigma^2 + 1.890625)(1/sigma^2 + 1 / 1.375) - 1
+        '''
+        # self.sigma = model.z_en + 3 * model.z_he
+        # self.kl = (0.5 / num_nodes) * tf.reduce_mean(
+        #     tf.reduce_sum(
+        #         (tf.square(model.z_ex) + tf.square(self.sigma) + 1.890625)
+        #         * (1 / tf.square(self.sigma) + 1 / 1.375)
+        #         - 2, 1
+        #     )
+        # )
 
         # self.cost -= self.kl
         self.cost += self.kl

@@ -163,7 +163,6 @@ class GCNModelCMVAE(Model):
 
         # en 10* 调整.
         # self.en = 1e-6 + 10 * GraphConvolution(input_dim=FLAGS.hidden1,
-        # z_en = GraphConvolution(input_dim=FLAGS.hidden1,
         self.z_log_en = GraphConvolution(input_dim=FLAGS.hidden1,
                                          output_dim=FLAGS.hidden2,
                                          adj=self.adj,
@@ -188,18 +187,32 @@ class GCNModelCMVAE(Model):
         self.z_mean = self.z_ex
 
         '''
-        # 增加循环采样.
+        # 增加循环采样，多次采样取均值.
         # 相当于增加采样次数.
+        # 实验结果表明：
+        （1）模型内部多次采样，能够减小实验结果的波动范围；
+        （2）能够大大减小交叉熵损失.
+        （3）设置sampling_num值为1000 与 2000效果差异不大.
+            设值sampling_num=500，300 epoch交叉熵能下降到0.407
+            设值sampling_num=1000，300 epoch交叉熵能下降到0.404
         '''
+        sampling_num = 1000
         random_sample_1 = tf.random_normal([self.n_samples, FLAGS.hidden2])
-        for i in range(999):
+        for i in range(sampling_num - 1):
             random_sample_1 += tf.random_normal([self.n_samples, FLAGS.hidden2])
-        self.sample_1 = random_sample_1 / 1000
+        self.sample_1 = random_sample_1 / sampling_num
+        self.z_enn = self.z_en + self.sample_1 * self.z_he
 
-        random_sample_2 = tf.random_normal([self.n_samples, FLAGS.hidden2])
-        for i in range(999):
-            random_sample_2 += tf.random_normal([self.n_samples, FLAGS.hidden2])
-        random_sample_2 = random_sample_2 / 1000
+        self.sample_2 = tf.random_normal([self.n_samples, FLAGS.hidden2])
+        for i in range(sampling_num - 1):
+            self.sample_2 += tf.random_normal([self.n_samples, FLAGS.hidden2])
+        self.sample_2 = self.sample_2 / sampling_num
+        self.z = self.z_ex + self.sample_2 * self.z_enn
+
+        # self.z = self.z_ex + tf.random_normal([self.n_samples, FLAGS.hidden2]) * self.z_enn
+        # for i in range(999):
+        #     self.z += self.z_ex + tf.random_normal([self.n_samples, FLAGS.hidden2]) * self.z_enn
+        # self.z = self.z / 1000
 
         '''
         # 两次采样操作.
@@ -207,16 +220,13 @@ class GCNModelCMVAE(Model):
         # 第一次采样
         Enn = En + epsilon * He
         '''
-        # self.z_enn = self.z_log_en + tf.random_normal([self.n_samples, FLAGS.hidden2]) * tf.exp(self.z_log_he)
         # self.z_enn = self.z_en + tf.random_normal([self.n_samples, FLAGS.hidden2]) * self.z_he
-        self.z_enn = self.z_en + self.sample_1 * self.z_he
 
         '''
         # 第二次采样
         z = Ex + epsilon * Enn
         '''
-        self.z = self.z_ex + tf.random_normal([self.n_samples, FLAGS.hidden2]) * self.z_enn
-        # self.z = self.z_ex + random_sample_2 * self.z_enn
+        # self.z = self.z_ex + tf.random_normal([self.n_samples, FLAGS.hidden2]) * self.z_enn
 
         self.reconstructions = InnerProductDecoder(input_dim=FLAGS.hidden2,
                                                    act=lambda x: x,
