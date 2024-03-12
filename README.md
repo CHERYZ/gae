@@ -1,3 +1,4 @@
+TEST
 Graph Auto-Encoders
 ============
 
